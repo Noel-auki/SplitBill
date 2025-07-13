@@ -1,4 +1,4 @@
-const { Pool } = require('pg');
+const { pool } = require('../config/db');
 
 /**
  * Validates the split bill request parameters

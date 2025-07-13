@@ -1,3 +1,4 @@
+
 # @butler/split-bill-engine
 
 Split bill functionality for Butler POS system.
