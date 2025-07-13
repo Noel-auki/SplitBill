@@ -1,0 +1,27 @@
+{
+  "name": "@butler/split-bill-engine",
+  "version": "1.0.0",
+  "description": "Split bill functionality for Butler POS system",
+  "main": "src/index.js",
+  "scripts": {
+    "test": "jest",
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "pg": "^8.11.5",
+    "express": "^4.21.1"
+  },
+  "peerDependencies": {
+    "express": "^4.21.0"
+  },
+  "keywords": ["butler", "pos", "split-bill", "billing"],
+  "author": "Butler Team",
+  "license": "ISC",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/YOUR_USERNAME/split-bill-engine.git"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  }
+} 
