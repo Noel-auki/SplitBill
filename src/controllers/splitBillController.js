@@ -1,4 +1,5 @@
 const { pool } = require('../config/db');
+const { completeOrder } = require('@butler/order-engine/src/utils/order');
 
 /**
  * Validates the split bill request parameters
@@ -152,10 +153,13 @@ const createSplitOrders = async (originalOrder, splits, tableId, originalOrderId
       });
     }
 
-    // Mark original order as complete with payment_method as 'split'
-    await client.query(
-      'UPDATE orders SET status = $1, payment_method = $2 WHERE id = $3',
-      ['completed', 'split', originalOrderId]
+    // Mark original order as complete using the completeOrder function
+    // This properly moves the order to completed_orders table and handles all cleanup
+    await completeOrder(
+      originalOrder.restaurant_id,
+      originalOrder.table_id,
+      0, // total amount is 0 since it's split
+      'split' // payment method indicates this order was split
     );
 
     await client.query('COMMIT');
@@ -173,7 +177,7 @@ const createSplitOrders = async (originalOrder, splits, tableId, originalOrderId
  * Main controller for splitting bills
  * This function expects a database pool to be passed in
  */
-const splitBill = async (req, res, pool) => {
+const splitBill = async (req, res) => {
   try {
     // 1. Validate request
     validateSplitRequest(req.body);
@@ -200,7 +204,7 @@ const splitBill = async (req, res, pool) => {
     }
 
     // 4. Create split orders in database
-    const results = await createSplitOrders(order, splits, tableId, orderId, pool);
+    const results = await createSplitOrders(order, splits, tableId, orderId);
 
     // 5. Return response
     return res.json({
