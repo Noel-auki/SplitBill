@@ -102,7 +102,7 @@ const calculatePercentageSplit = (items, percentages) => {
 /**
  * Creates new split orders in the database
  */
-const createSplitOrders = async (originalOrder, splits, tableId, originalOrderId, pool) => {
+const createSplitOrders = async (originalOrder, splits, tableId, originalOrderId) => {
   const results = [];
   const client = await pool.connect();
 
