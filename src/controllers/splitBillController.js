@@ -1,5 +1,5 @@
 const { pool } = require('../config/db');
-const { completeOrder } = require('@butler/order-engine/src/utils/order');
+const { completeOrder: completeOrderController } = require('@butler/order-engine/src/controllers/orderController');
 
 /**
  * Validates the split bill request parameters
@@ -153,16 +153,38 @@ const createSplitOrders = async (originalOrder, splits, tableId, originalOrderId
       });
     }
 
-    // Mark original order as complete using the completeOrder function
-    // This properly moves the order to completed_orders table and handles all cleanup
-    await completeOrder(
-      originalOrder.restaurant_id,
-      originalOrder.table_id,
-      0, // total amount is 0 since it's split
-      'split' // payment method indicates this order was split
-    );
 
     await client.query('COMMIT');
+    
+    // Complete the original order using the controller function
+    const mockReq = {
+      params: {
+        restaurantId: originalOrder.restaurant_id,
+        tableId: originalOrder.table_id
+      },
+      body: {
+        total: 0, // total amount is 0 since it's split
+        paymentMethod: 'split' // payment method indicates this order was split
+      }
+    };
+    
+    const mockRes = {
+      status: (code) => ({
+        json: (data) => {
+          mockRes.statusCode = code;
+          mockRes.responseData = data;
+        }
+      }),
+      statusCode: 200,
+      responseData: null
+    };
+    
+    await completeOrderController(mockReq, mockRes);
+    
+    if (mockRes.statusCode >= 400) {
+      console.log('Warning: Failed to complete original order, but split was successful');
+    }
+    
     return results;
 
   } catch (error) {
