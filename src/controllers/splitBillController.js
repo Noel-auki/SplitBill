@@ -1,5 +1,5 @@
 const { pool } = require('../config/db');
-const { completeOrder: completeOrderController } = require('@butler/order-engine/src/controllers/orderController');
+const { completeOrder } = require('@butler/order-engine/src/utils/order');
 
 /**
  * Validates the split bill request parameters
@@ -156,106 +156,17 @@ const createSplitOrders = async (originalOrder, splits, tableId, originalOrderId
 
     await client.query('COMMIT');
     
-    // Complete the original order using the controller function
-    console.log('=== SPLIT BILL: Starting order completion process ===');
-    console.log('Original order details:', {
-      orderId: originalOrder.id,
-      restaurantId: originalOrder.restaurant_id,
-      tableId: originalOrder.table_id,
-      total: 0,
-      paymentMethod: 'split'
-    });
+    // Complete the original order outside of the transaction to avoid conflicts
+    const completionResult = await completeOrder(
+      originalOrder.restaurant_id,
+      originalOrder.table_id,
+      0, // total amount is 0 since it's split
+      'split' // payment method indicates this order was split
+    );
     
-    const mockReq = {
-      params: {
-        restaurantId: originalOrder.restaurant_id,
-        tableId: originalOrder.table_id
-      },
-      body: {
-        total: 0, // total amount is 0 since it's split
-        paymentMethod: 'split' // payment method indicates this order was split
-      }
-    };
-    
-    console.log('Mock request object:', JSON.stringify(mockReq, null, 2));
-    
-    const mockRes = {
-      status: (code) => ({
-        json: (data) => {
-          mockRes.statusCode = code;
-          mockRes.responseData = data;
-          console.log(`Response status: ${code}, data:`, JSON.stringify(data, null, 2));
-        }
-      }),
-      statusCode: 200,
-      responseData: null
-    };
-    
-    try {
-      console.log('Calling completeOrderController...');
-      await completeOrderController(mockReq, mockRes);
-      console.log('completeOrderController completed successfully');
-      console.log('Final response status:', mockRes.statusCode);
-      console.log('Final response data:', mockRes.responseData);
-      
-      if (mockRes.statusCode >= 400) {
-        console.log('❌ ERROR: Failed to complete original order, but split was successful');
-        console.log('Error details:', mockRes.responseData);
-      } else {
-        console.log('✅ SUCCESS: Original order completed successfully');
-      }
-    } catch (error) {
-      console.log('❌ EXCEPTION: Error calling completeOrderController:', error);
-      console.log('Error stack:', error.stack);
+    if (!completionResult) {
+      console.log('Warning: Failed to complete original order, but split was successful');
     }
-    
-    // Check if the original order still exists after completion
-    try {
-      const checkOrderResult = await pool.query(
-        'SELECT id, restaurant_id, table_id FROM orders WHERE restaurant_id = $1 AND table_id = $2',
-        [originalOrder.restaurant_id, originalOrder.table_id]
-      );
-      
-      console.log('=== POST-COMPLETION ORDER CHECK ===');
-      console.log('Orders found for table:', checkOrderResult.rows.length);
-      if (checkOrderResult.rows.length > 0) {
-        console.log('Remaining orders:', checkOrderResult.rows.map(row => ({
-          id: row.id,
-          restaurantId: row.restaurant_id,
-          tableId: row.table_id
-        })));
-      } else {
-        console.log('✅ No orders found - original order successfully removed');
-      }
-    } catch (error) {
-      console.log('❌ Error checking post-completion orders:', error);
-    }
-    
-    // Check if the order was moved to completed_orders
-    try {
-      const checkCompletedResult = await pool.query(
-        'SELECT id, restaurant_id, table_id, total, completed_at FROM completed_orders WHERE restaurant_id = $1 AND table_id = $2 ORDER BY completed_at DESC LIMIT 1',
-        [originalOrder.restaurant_id, originalOrder.table_id]
-      );
-      
-      console.log('=== COMPLETED ORDERS CHECK ===');
-      console.log('Completed orders found:', checkCompletedResult.rows.length);
-      if (checkCompletedResult.rows.length > 0) {
-        console.log('Latest completed order:', {
-          id: checkCompletedResult.rows[0].id,
-          restaurantId: checkCompletedResult.rows[0].restaurant_id,
-          tableId: checkCompletedResult.rows[0].table_id,
-          total: checkCompletedResult.rows[0].total,
-          completedAt: checkCompletedResult.rows[0].completed_at
-        });
-      } else {
-        console.log('❌ No completed orders found - order may not have been moved');
-      }
-    } catch (error) {
-      console.log('❌ Error checking completed orders:', error);
-    }
-    
-    console.log('=== SPLIT BILL: Order completion process finished ===');
     
     return results;
 
