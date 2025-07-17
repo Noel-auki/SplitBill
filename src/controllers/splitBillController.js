@@ -161,7 +161,10 @@ const createSplitOrders = async (originalOrder, splits, tableId, originalOrderId
       originalOrder.restaurant_id,
       originalOrder.table_id,
       0, // total amount is 0 since it's split
-      'split' // payment method indicates this order was split
+      'split', // payment method indicates this order was split
+      '', // razorpayOrderId
+      '', // razorpayPaymentId
+      originalOrder.id // Pass the specific original order ID
     );
     
     if (!completionResult) {
